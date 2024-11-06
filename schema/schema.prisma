@@ -1,0 +1,736 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins", "tracing", "prismaSchemaFolder", "views", "postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+model CourierAgent {
+  id          String   @id @default(uuid())
+  uid         Int      @unique @default(autoincrement())
+  name        String   @db.VarChar(255)
+  shortName   String   @unique @db.VarChar(255)
+  logo        String
+  banner      String?
+  description String?
+  website     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  deliveryZones CourierDeliveryZone[]
+  splits        Split[]
+  waybills      SplitWaybill[]
+}
+
+model CourierDeliveryZone {
+  id             String       @id @default(uuid())
+  uid            Int          @unique @default(autoincrement())
+  state          String       @db.VarChar(255)
+  city           String       @db.VarChar(255)
+  courierAgentId String
+  courierAgent   CourierAgent @relation(fields: [courierAgentId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  splitWaybill SplitWaybill[]
+  splitSlot    SplitSlot[]
+  request      Request[]
+
+  @@unique([state, city, courierAgentId])
+}
+
+model FileRecord {
+  id             String        @id @default(uuid())
+  uid            Int           @unique @default(autoincrement())
+  name           String
+  path           String        @unique
+  size           Int
+  mimetype       String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  width          Int?
+  height         Int?
+  ratio          Float?
+  split          Split?        @relation(name: "productImages", fields: [splitId], references: [id], onDelete: Cascade)
+  splitId        String?
+  groups         Group[]
+  users          User[]
+  splitWaybill   SplitWaybill? @relation(fields: [splitWaybillId], references: [id], onDelete: Cascade)
+  splitWaybillId String?
+  Post           Post?         @relation(fields: [postId], references: [id])
+  postId         String?
+  PostComment    PostComment?  @relation(fields: [postCommentId], references: [id])
+  postCommentId  String?
+  md5            String?
+  message        Message?      @relation(fields: [messageId], references: [id])
+  messageId      String?
+
+  deletedAt DateTime?
+
+  merchantProfileScreenshotSplit   Split?  @relation("merchantProfileScreenshot")
+  merchantProfileScreenshotSplitId String? @unique
+  report                           Report? @relation(fields: [reportId], references: [id])
+  reportId                         String?
+
+  @@index([path])
+}
+
+model Request {
+  id                  String         @id @default(uuid())
+  uid                 Int            @unique @default(autoincrement())
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  status              RequestStatus  @default(PENDING)
+  userId              String
+  user                User           @relation(fields: [userId], references: [id])
+  splitId             String?
+  split               Split?         @relation(fields: [splitId], references: [id])
+  message             String?
+  chatId              String?
+  chat                Chat?          @relation(fields: [chatId], references: [id])
+  groupId             String?
+  group               Group?         @relation(fields: [groupId], references: [id])
+  slots               Int?
+  payTransaction      Transaction?   @relation("splitShareRequestPayment", fields: [payTransactionId], references: [id])
+  payTransactionId    String?        @unique
+  refundTransaction   Transaction?   @relation("splitShareRequestRefund", fields: [refundTransactionId], references: [id])
+  refundTransactionId String?        @unique
+  voidedBy            User?          @relation("requestVoidedBy", fields: [voidedById], references: [id])
+  voidedById          String?
+  Notification        Notification[]
+
+  deliveryZone   CourierDeliveryZone? @relation(fields: [deliveryZoneId], references: [id])
+  deliveryZoneId String?
+  pickupAddress  String?
+}
+
+model Report {
+  id        String          @id @default(uuid())
+  uid       Int             @unique @default(autoincrement())
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  caseId    Int             @default(autoincrement())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id])
+  reason    String          @db.Text
+  status    ReportStatus    @default(PENDING)
+  meta      Json
+  files     FileRecord[]
+  comments  ReportComment[]
+  type      ReportType?
+
+  // entity which the report is related to
+  referenceType ReportReferenceType?
+  referenceId   String?
+}
+
+model Reaction {
+  id        String       @id @default(uuid())
+  uid       Int          @unique @default(autoincrement())
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  reaction  ReactionType @default(LOVE)
+  type      ReactionType @default(LIKE)
+  userId    String
+  active    Boolean      @default(true)
+  user      User         @relation(fields: [userId], references: [id])
+  postId    String?
+  post      Post?        @relation(fields: [postId], references: [id])
+  commentId String?
+  comment   PostComment? @relation(fields: [commentId], references: [id])
+}
+
+model Mention {
+  id        String          @id @default(uuid())
+  uid       Int             @unique @default(autoincrement())
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  start     Int
+  end       Int
+  content   String
+  itemType  MentionItemType
+  comment   PostComment?    @relation("PostCommentToMention", fields: [commentId], references: [id])
+  commentId String?
+}
+
+model Address {
+  id           String    @id @default(uuid())
+  uid          Int       @unique @default(autoincrement())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  placeId      String
+  streetNumber String?
+  street       String?
+  city         String?
+  town         String?
+  community    String?
+  neighborhood String?
+  lga          String?
+  state        String?
+  country      String?
+  postalCode   String?
+  countryCode  String?
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  longitude    Float?
+  latitude     Float?
+  coords       Location? @relation(fields: [coordsId], references: [id])
+  coordsId     Int?
+
+  active Boolean @default(true)
+  label  String  @default("Home")
+  type   String  @default("HOME")
+
+  posts  Post[]
+  groups Group[]
+
+  @@index([placeId])
+  @@index([userId])
+}
+
+model Location {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  coords    Unsupported("geometry(Point, 4326)")
+  addresses Address[]
+
+  @@index([coords], name: "location_idx", type: Gist)
+}
+
+model Connection {
+  id          String           @id @default(uuid())
+  uid         Int              @unique @default(autoincrement())
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  requesterId String
+  requester   User             @relation("RequestedConnection", fields: [requesterId], references: [id])
+  addresseeId String
+  addressee   User             @relation("RecievedConnection", fields: [addresseeId], references: [id])
+  status      ConnectionStatus @default(PENDING)
+
+  blockedById  String?
+  Notification Notification[]
+
+  @@unique([requesterId, addresseeId])
+  @@index([requesterId, addresseeId])
+}
+
+model Notification {
+  id            String               @id @default(uuid())
+  uid           Int                  @unique @default(autoincrement())
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  ownerId       String
+  owner         User                 @relation("NotificationOwner", fields: [ownerId], references: [id])
+  status        NotificationStatus   @default(UNREAD)
+  type          NotificationType
+  category      NotificationCategory
+  queueId       String?
+  groupId       String?
+  group         Group?               @relation(fields: [groupId], references: [id])
+  splitId       String?
+  split         Split?               @relation(fields: [splitId], references: [id])
+  splitSlotId   String?
+  splitSlot     SplitSlot?           @relation(fields: [splitSlotId], references: [id])
+  chatId        String?
+  chat          Chat?                @relation(fields: [chatId], references: [id])
+  transactionId String?
+  transaction   Transaction?         @relation(fields: [transactionId], references: [id])
+  postId        String?
+  post          Post?                @relation(fields: [postId], references: [id])
+  commentId     String?
+  comment       PostComment?         @relation(fields: [commentId], references: [id])
+  requestId     String?
+  request       Request?             @relation(fields: [requestId], references: [id])
+  connectionId  String?
+  connection    Connection?          @relation(fields: [connectionId], references: [id])
+  inviteId      String?
+  invite        Invite?              @relation(fields: [inviteId], references: [id])
+}
+
+model UserActivity {
+  id        String   @id @default(uuid())
+  uid       Int      @unique @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId   String
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meta     Json?
+  activity UserActivityType
+}
+
+model DevicePNToken {
+  id        String              @id @default(uuid())
+  uid       Int                 @unique @default(autoincrement())
+  token     String
+  userId    String?
+  // device ID
+  did       String              @unique
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  user      User?               @relation(fields: [userId], references: [id])
+  status    DevicePNTokenStatus @default(ACTIVE)
+
+  deletedAt DateTime?
+
+  @@index([userId])
+  @@index([did])
+}
+
+model Invite {
+  id        String       @id @default(uuid())
+  uid       Int          @unique @default(autoincrement())
+  createdAt DateTime     @default(now())
+  status    InviteStatus @default(PENDING)
+
+  inviteeId String
+  invitee   User   @relation("ReceivedInvite", fields: [inviteeId], references: [id])
+  inviterId String
+  inviter   User   @relation("SentInvite", fields: [inviterId], references: [id])
+
+  splitId      String
+  split        Split          @relation(fields: [splitId], references: [id])
+  splitSlotId  String         @unique
+  splitSlot    SplitSlot      @relation(fields: [splitSlotId], references: [id])
+  groupId      String
+  group        Group          @relation(fields: [groupId], references: [id])
+  notification Notification[]
+}
+
+// InviteCode is used to generate invite codes for users to invite other users to join the platform
+model InviteCode {
+  id        String   @id @default(uuid())
+  uid       Int      @unique @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  code          String                  @unique
+  createdById   String
+  createdBy     User                    @relation(fields: [createdById], references: [id])
+  referenceId   String
+  referenceType InviteCodeReferenceType
+  source        InviteCodeSource
+
+  @@index([code])
+}
+
+model ReportComment {
+  id        String    @id @default(uuid())
+  uid       Int       @unique @default(autoincrement())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  comment   String
+  reportId  String
+  report    Report    @relation(fields: [reportId], references: [id])
+  creatorId String
+  creator   AdminUser @relation(fields: [creatorId], references: [id])
+}
+
+model Approval {
+  id        String         @id @default(uuid())
+  uid       Int            @unique @default(autoincrement())
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  comment   String?
+  status    ApprovalStatus
+
+  approvedById String
+  approvedBy   AdminUser @relation(fields: [approvedById], references: [id])
+
+  splitId String?
+  split   Split?  @relation(fields: [splitId], references: [id])
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  FLAGGED
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  CANCELED
+}
+
+enum ChargeRecordType {
+  FIXED
+  PERCENTAGE
+}
+
+enum GroupType {
+  NORMAL
+  SPLIT_SHARE
+  SPLIT_BUY
+}
+
+enum SplitType {
+  NONE
+  SPLIT_SHARE
+  SPLIT_BUY
+}
+
+enum GroupPrivacy {
+  PUBLIC
+  PRIVATE
+}
+
+enum GroupRoleType {
+  OWNER
+  ADMIN
+  MODERATOR
+  MEMBER
+  GATEKEEPER_AGENT
+}
+
+enum SplitSlotStatus {
+  PENDING
+  RESERVED
+  PAID
+  CANCELED
+  REFUNDED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  OPEN
+  CLOSED
+}
+
+enum WaybillStatus {
+  PENDING
+  SHIPPED
+  DELIVERED
+}
+
+enum ReportStatus {
+  PENDING
+  OPEN
+  ON_HOLD
+  RESOLVED
+  CLOSED
+}
+
+enum TransactionStatus {
+  PENDING
+  // for use mostly in withdrawals when transaction can no longer be cancelled
+  PROCESSING
+  SUCCESS
+  FAILED
+  CANCELED
+}
+
+enum TransactionType {
+  DEBIT
+  DEPOSIT
+  REVERSED
+  TOPUP
+  WITHDRAWAL
+  FEE_DEBIT
+  FEE_DEPOSIT
+}
+
+enum MessageReferenceType {
+  SPLIT_JOIN_REQUEST
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum OnlineStatus {
+  ONLINE
+  OFFLINE
+}
+
+enum RequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELED
+}
+
+enum PostVisibility {
+  PUBLIC
+  ONLY_ME
+  ONLY_NEIGHBORHOOD
+}
+
+enum ReactionType {
+  LIKE
+  LOVE
+  HAHA
+  WOW
+  SAD
+  ANGRY
+}
+
+enum MentionItemType {
+  USER
+  POST
+  POST_COMMENT
+  LINK
+}
+
+enum AppPlatform {
+  IOS
+  ANDROID
+  WEB
+}
+
+enum PaymentProvider {
+  PAYSTACK
+  FLUTTERWAVE
+  FLICK
+}
+
+enum ConnectionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELED
+  IGNORED
+  BLOCKED
+}
+
+enum DevicePNTokenStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum UserActivityType {
+  // USER MONITORING
+  UserLoggedIn
+  UserLoggedOut
+  UserOnline
+  UserOffline
+
+  // USER VERIFICATIONS
+  VerifiedBVN
+
+  // REQUEST_CONNECTION
+  SentConnectionRequest
+  ReceivedConnectionRequest
+  AcceptedConnectionRequest
+  RejectedConnectionRequest
+  CancelledConnectionRequest
+  IgnoredConnectionRequest
+  BlockedConnectionRequest
+  BlockedUser
+  DisconnectedConnection
+  // GROUP ACTIVITY
+  CreatedGroup
+  UpdatedGroup
+  DeletedGroup
+  JoinedGroup
+  LeftGroup
+  BecameGroupAdmin
+  BecameGroupModerator
+  AddedGroupMember
+  InvitedGroupMembers
+  RemovedGroupMember
+  BlockedGroupMember
+  UnblockedGroupMember
+  RequestedToJoinGroup
+  CancelledJoinGroup
+  // POST ACTIVITY
+  PublishedPost
+  PublishedPostComment
+  ReactedToPost
+  ReactedToPostComment
+  DeletedPost
+  DeletedPostComment
+  DeletedSplit
+  Deposit
+  Withdraw
+  SentMessage
+  ReceivedMessage
+  // PAYMENT ACTIVITY
+  InitiatedPayment
+  SuccessfulPayment
+  FailedPayment
+  CancelledPayment
+  AddedBankAccount
+  DepositSuccess
+  DepositFailed
+  // WITHDRAWAL
+  InitiatedWithdrawal
+  SuccessfulWithdrawal
+  FailedWithdrawal
+  CancelledWithdrawal
+  // SPLIT GROUP ACTIVITY
+  CreatedSplit
+  RequestedToJoinSplit
+  SplitJoinRequestAutoCancelled
+  CancelledSplitJoinRequest
+  AcceptedSplitJoinRequest
+  RejectedSplitJoinRequest
+  JoinedSplit
+  ConfirmedBuyerItemPickup
+  AddedWaybill
+  ConfirmedWaybillDelivery
+  MarkedWaybillAsDelivered
+  SplitFundReleased
+
+  // MISC
+  FiledReport
+}
+
+enum GroupMemberStatus {
+  PENDING
+  ACTIVE
+  BLOCKED
+}
+
+enum NotificationStatus {
+  SEEN
+  UNREAD
+  READ
+}
+
+enum NotificationType {
+  CONNECTION_REQUEST
+  CONNECTION_REQUEST_ACCEPTED
+  PAYMENT_TOPUP
+  PAYMENT_DEPOSIT
+  PAYMENT_WITHDRAW
+  PAYMENT_TRANSFER
+  PAYMENT_DEBIT
+  SPLIT_JOIN_REQUEST
+  SPLIT_JOIN_REQUEST_ACCEPTED
+  SPLIT_JOIN_REQUEST_REJECTED
+  SPLIT_JOIN_REQUEST_CANCELLED
+  SPLIT_JOIN_JOINED
+  GROUP_JOIN_REQUEST
+  GROUP_JOIN_REQUEST_ACCEPTED
+  GROUP_INVITE
+  SPLIT_ADMIN_RENEWAL
+  SPLIT_MEMBER_RENEWAL
+  SPLIT_INVITE
+  SPLIT_SLOT_EMAIL_ADDED
+  SPLIT_SLOT_EMAILS_INVITED
+  SPLIT_SLOT_PICKUP_CONFIRMED_ADMIN
+  SPLIT_SLOT_PICKUP_CONFIRMED_MEMBER
+  DELIVERY_WAYBILL_ADDED
+  DELIVERY_ITEM_DELIVERED
+  DELIVERY_CONFIRMED
+  SPLIT_PAYOUT
+  SPLIT_SLOT_REPORTED // to delete
+  SPLIT_MEMBER_REMOVED // to delete
+  NEW_CHAT_MESSAGE
+  SPLIT_APPROVED
+  SPLIT_FLAGGED
+  GATEKEEPER_FEATURE_REQUEST_APPROVED
+  GATEKEEPER_USER_ENABLED
+}
+
+enum NotificationCategory {
+  UPDATES
+  REQUESTS
+}
+
+enum SplitCycleStatus {
+  PENDING
+  ACTIVE
+  CANCELED
+  COMPLETED
+}
+
+enum ShippingMethod {
+  PICKUP
+  DELIVERY
+}
+
+enum GroupStatus {
+  ACTIVE
+  DEACTIVATED
+  SUSPENDED
+  BANNED
+}
+
+enum AdminRole {
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  VERIFIED
+  DEACTIVATED
+  SUSPENDED
+  BANNED
+  DELETED
+}
+
+enum InviteCodeReferenceType {
+  PROFILE
+  SPLIT
+  GROUP
+}
+
+enum InviteCodeSource {
+  MOBILE
+  WEB
+}
+
+enum SplitActivityType {
+  MemberJoined
+  MemberRemovedForNoPickup // to delete
+  MemberRemovedForNoAdminDelivery // to delete
+  MemberRemoved // to delete
+  PickupConfirmed
+  EmailInviteSent
+  EmailInviteConfirmed
+  DeliveryWaybillAdded
+  SplitSlotReported // to delete
+  DeliveryConfirmed
+}
+
+enum ReportReferenceType {
+  SPLIT_SLOT
+  COMMUNITY
+  POST
+  SPLIT
+  PROFILE
+  PROFILE_CHAT
+  TRANSACTION
+}
+
+enum ReportType {
+  // Splits
+  // -- split-admin 
+  BUYER_NO_PICKUP
+  BUYER_NOT_CONFIRMED_DELIVERY
+  // -- split-member
+  EMAIL_NOT_ADDED
+  PICKUP_NOT_RECEIVED
+  AFTER_PICKUP_ISSUE
+  DELIVERY_NO_WAYBILL_ADDED
+  DELIVERY_SHIPPING_ISSUE
+  DELIVERY_ARRIVED_ISSUE
+  AFTER_DELIVERY_RECEIPT_ISSUE
+}
+
+enum EscrowStatus {
+  PENDING
+  IN_PROGRESS
+  RELEASED
+  CANCELED
+}
+
+enum GroupCategory {
+  PLACE
+  PLACE_CITY
+  FORUM
+}

@@ -1,0 +1,119 @@
+model Post {
+  id            String         @id @default(uuid())
+  uid           Int            @unique @default(autoincrement())
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  text          String
+  tokenizedText Json?
+  media         FileRecord[]
+  userId        String
+  user          User           @relation(fields: [userId], references: [id])
+  visibility    PostVisibility @default(PUBLIC)
+  type          PostType       @default(GENERAL)
+  groupId       String?
+  group         Group?         @relation(fields: [groupId], references: [id])
+  comments      PostComment[]
+  reactions     Reaction[]
+  notifications Notification[]
+
+  addressId String?
+  address   Address? @relation(fields: [addressId], references: [id])
+
+  reactionsLikeCount Int                  @default(0)
+  commentsCount      Int                  @default(0)
+  PostClassification PostClassification[]
+  PostFeed           PostFeed[]
+
+  deletedAt  DateTime?
+  editedAt   DateTime?
+  revisions  Json?
+  sosAddress SosLocation?
+}
+
+model PostComment {
+  id            String       @id @default(uuid())
+  uid           Int          @unique @default(autoincrement())
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  text          String
+  tokenizedText Json?
+  media         FileRecord[]
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  postId        String
+  post          Post         @relation(fields: [postId], references: [id])
+  parentId      String?
+  depth         Int          @default(0)
+  repliedToId   String?
+  repliedTo     PostComment? @relation("PostCommentToReplyTo", fields: [repliedToId], references: [id])
+  parent        PostComment? @relation("PostCommentToPostComment", fields: [parentId], references: [id])
+
+  reactions Reaction[]
+  children  PostComment[] @relation("PostCommentToPostComment")
+  replies   PostComment[] @relation("PostCommentToReplyTo")
+  memtions  Mention[]     @relation("PostCommentToMention")
+
+  deletedAt DateTime?
+
+  reactionsLikeCount Int            @default(0)
+  commentsCount      Int            @default(0)
+  Notification       Notification[]
+}
+
+model PostClassification {
+  id        Int      @unique @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  topic     String   @db.VarChar(255)
+  sentiment String   @db.VarChar(255)
+  entities  Json? // { name: string; type: string }[];
+  hashtags  String[]
+  keywords  String[]
+
+  language       String?
+  contentQuality Float?
+  contentSafety  Boolean?
+  isAdultContent Boolean?
+  isScam         Boolean?
+
+  postTimestamp DateTime?
+  postId        String
+  post          Post      @relation(fields: [postId], references: [id])
+}
+
+model PostFeed {
+  id                      String   @id @default(uuid())
+  uid                     Int      @unique @default(autoincrement())
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  index                   Int
+  reasonForRecommendation String?
+  hidden                  Boolean  @default(false)
+  postId                  String
+  post                    Post     @relation(fields: [postId], references: [id])
+  userId                  String
+  user                    User     @relation(fields: [userId], references: [id])
+
+  @@index([postId])
+  @@index([userId])
+}
+
+enum PostType {
+  GENERAL
+  EMERGENCY
+  SOS
+}
+
+model SosLocation {
+  id             String   @id @default(uuid())
+  uid            Int      @unique @default(autoincrement())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  isLive         Boolean  @default(false)
+  startLongitude Float
+  startLatitude  Float
+  endLongitude   Float?
+  endLatitude    Float?
+  postId         String   @unique
+  post           Post     @relation(fields: [postId], references: [id])
+}
