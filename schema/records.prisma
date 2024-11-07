@@ -1,0 +1,68 @@
+model HeartRate {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  value     Float // beats per minute
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("heartRates")
+}
+
+model Temperature {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  value     Float // body temperature in Celsius
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("temperatures")
+}
+
+model BloodPressure {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  systolic  Float? // systolic pressure
+  diastolic Float? // diastolic pressure
+  value     Float? // value
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("bloodPressures")
+}
+
+model BloodOxygen {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  value     Float // oxygen saturation in %
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("bloodOxygens")
+}
+
+model Steps {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  count     Int // steps count
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("stepsRecords")
+}
+
+model Sos {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation("UserSosMessages", fields: [userId], references: [id]) // User who sent the SOS
+  familyMembers User[]   @relation("SosFamilyMembers")
+  message       String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("sosMessages")
+}

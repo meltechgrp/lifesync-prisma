@@ -1,198 +1,45 @@
-model Wallet {
-  id     String @id @default(uuid())
-  uid    Int    @unique @default(autoincrement())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id])
-
-  balance      Float
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  inflows      Transaction[] @relation("fromWallet")
-  outflows     Transaction[] @relation("toWallet")
-  transactions Transaction[]
-  bankAccounts BankAccount[]
-  currency     String        @default("NGN")
-
-  @@index([userId])
-}
-
 // transactions are used to track the changes in the wallet
 model Transaction {
   id  String @id @default(uuid())
   uid Int    @unique @default(autoincrement())
 
   amount    Float
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  currency  String   @default("NGN")
-  fee       Float    @default(0)
-  walletId  String
-  // wallet refers to the wallet that the transaction is associated with
-  wallet    Wallet   @relation(fields: [walletId], references: [id])
-
-  fromWalletId String?
-  toWalletId   String?
-  type         TransactionType?
-  // fromWallet refers to the wallet that the amount is debited from
-  fromWallet   Wallet?           @relation(name: "fromWallet", fields: [fromWalletId], references: [id])
-  // toWallet refers to the wallet that the amount is credited to
-  toWallet     Wallet?           @relation(name: "toWallet", fields: [toWalletId], references: [id])
-  status       TransactionStatus @default(PENDING)
-
-  comment            String?
-  source             String?
-  note               String?
-  splitSlot          SplitSlot? @relation(name: "slotPayment")
-  splitSlotRelease   SplitSlot? @relation(name: "slotRelease", fields: [splitSlotReleaseId], references: [id])
-  splitSlotReleaseId String?
-
-  requestPaidFor     Request?  @relation(name: "splitShareRequestPayment")
-  requestRefundedFor Request?  @relation(name: "splitShareRequestRefund")
-  settledAt          DateTime?
-  settled            Boolean?  @default(false)
-
-  withdrawal           Withdrawal?    @relation("withdrawal")
-  deposit              Deposit?       @relation("deposit")
-  notifications        Notification[]
-  metadata             Json?
-  /// fingerprint is used to track transactions associated with the same payment,
-  /// for example, the transaction record for debit, the transaction for credit/deposit and the transaction record for application fee
-  fingerprint          String?
-  /// the transaction id of the transaction that triggered this transaction, e.g. debit transaction id for credit/deposit transaction
-  genesisTransactionId String?
-  requestId            String?
-
-  relatedTransactionIds String[] @default([])
-
-  sscrowRecord EscrowRecord?
-  paymentId    String?
-  payment      Payment?      @relation(fields: [paymentId], references: [id])
-}
-
-model Deposit {
-  id              String            @id @default(uuid())
-  uid             Int               @unique @default(autoincrement())
-  amount          Float
-  charge          Float             @default(0)
-  userId          String
-  currency        String            @default("NGN")
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  status          TransactionStatus @default(PENDING)
-  serviceId       String?
-  topUpId         String?
-  record          Json?
-  appPlatform     AppPlatform
-  deviceUniqueId  String
-  user            User              @relation(fields: [userId], references: [id])
-  transactionId   String?           @unique
-  transaction     Transaction?      @relation(name: "deposit", fields: [transactionId], references: [id])
-  paymentProvider PaymentProvider
-  paymentId       String?
-  payment         Payment?          @relation(fields: [paymentId], references: [id])
-}
-
-model Withdrawal {
-  id        String            @id @default(uuid())
-  uid       Int               @unique @default(autoincrement())
-  amount    Float
-  userId    String
-  user      User              @relation(fields: [userId], references: [id])
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
+  currency  String            @default("NGN")
+  fee       Float             @default(0)
+  walletId  String
+  type      TransactionType?
   status    TransactionStatus @default(PENDING)
-  serviceId String?
-  record    Json?
 
-  transactionId String?      @unique
-  transaction   Transaction? @relation(name: "withdrawal", fields: [transactionId], references: [id])
+  comment       String?
+  source        String?
+  note          String?
+  notifications Notification[]
+  metadata      Json?
+  requestId     String?
 
-  bankAccountId String
-  bankAccount   BankAccount @relation(fields: [bankAccountId], references: [id])
+  relatedTransactionIds String[] @default([])
+  orderId               String?
+  order                 Order?   @relation(fields: [orderId], references: [id])
 }
 
-model EscrowRecord {
-  id Int @id @default(autoincrement())
-
-  totalAmount     Float
-  totalCharge     Float
-  nextReleaseDate DateTime
-  status          EscrowStatus @default(PENDING)
-  // fields:
-  // scheduledReleaseDate
-  // amount
-  // charge
-  // status
-  // completedReleaseDate
-  // releaseTransactionId
-  releaseRecords  Json
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  completedAt DateTime?
-  cancelledAt DateTime?
-
-  cancellationReason String?
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-
-  transactionId String      @unique
-  transaction   Transaction @relation(fields: [transactionId], references: [id])
-}
-
-model ChargeRecord {
-  id          String           @id @default(uuid())
-  uid         Int              @unique @default(autoincrement())
-  shortName   String           @unique
-  type        ChargeRecordType
-  amount      Float
-  description String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-}
-
-model BankAccount {
-  id            String   @id @default(uuid())
-  uid           Int      @unique @default(autoincrement())
-  createdAt     DateTime @default(now())
-  ownerName     String
-  accountNumber String
-  bankName      String
-  bankCode      String
-
-  // this is specific to paystack and we need it to make transfers
-  // to customer's bank account. 
-  recipientCode String?
-
-  walletId String
-  wallet   Wallet @relation(fields: [walletId], references: [id])
-
-  userId      String
-  user        User         @relation(fields: [userId], references: [id])
-  withdrawals Withdrawal[]
-}
-
-model Payment {
-  id          String        @id @default(uuid())
-  uid         Int           @unique @default(autoincrement())
+model Order {
+  id          String      @id @default(uuid())
+  uid         Int         @unique @default(autoincrement())
   amount      Float?
-  currency    String        @default("NGN")
-  status      PaymentStatus @default(OPEN)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  currency    String      @default("NGN")
+  status      OrderStatus @default(OPEN)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
   title       String
   description String?
 
   closedAt DateTime?
 
-  userId  String
-  groupId String
+  userId String
 
-  user  User  @relation(fields: [userId], references: [id])
-  group Group @relation(fields: [groupId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 
   transactions Transaction[]
-  deposit      Deposit[]
 }

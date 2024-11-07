@@ -11,97 +11,57 @@ model User {
   /// This is the user phone number parsed with international format
   intlPhoneNumber String      @unique @db.VarChar(20)
   countryCode     String      @default("NG") @db.VarChar(3)
-  // USER | PLATFORM_PRIVATE_BOT | GATEKEEPER_AGENT
-  userTypeId      String      @default("USER")
-  bvn             String?
 
   isPhoneVerified Boolean @default(false)
   isEmailVerified Boolean @default(false)
-  isBVNVerified   Boolean @default(false)
-  isNINVerified   Boolean @default(false)
-  isWalletFunded  Boolean @default(false)
 
-  dob                  DateTime?
-  authToken            AuthToken[] /// @render(IGNORE)
-  /// KYC Stages (0 - phone not verified, 1 - phone verified, 2 - KYC 0 completed, 3 - KYC 1 completed)
-  kycStage             Int?                   @default(0)
-  gender               String?
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
-  group                Group[]
-  groupMembers         GroupMember[]          @relation("USER")
-  GroupRole            GroupRole[]
-  SplitSlot            SplitSlot[]
-  payments             Payment[]
-  photoId              String?
-  wallet               Wallet?
-  deposits             Deposit[]
-  withdraws            Withdrawal[]
-  splitPlatformSuggest SplitPlatformSuggest[]
-  messages             Message[]
-  bankAccounts         BankAccount[]
-
-  chatMember        ChatMember[]
-  reports           Report[]
-  chats             Chat[]
-  messageRecipients MessageRecipient[]
-
-  onlineStatus   UserOnlineStatus[]
-  requests       Request[]
-  voidedRequests Request[]          @relation("requestVoidedBy")
-  posts          Post[]
-  comments       PostComment[]
-  reactions      Reaction[]
-  activities     UserActivity[]
-  /// This is md5 of user connections userIds
   connectionHash String?
 
-  requestedConnections Connection[]   @relation("RequestedConnection")
-  receivedConnections  Connection[]   @relation("RecievedConnection")
-  inviter              GroupMember[]  @relation("INVITER")
-  notifications        Notification[] @relation("NotificationOwner")
-  addresses            Address[]
+  requestedConnections Connection[]       @relation("RequestedConnection")
+  receivedConnections  Connection[]       @relation("RecievedConnection")
+  dob                  DateTime?
+  height               Float?
+  weight               Float?
+  authToken            AuthToken[] /// @render(IGNORE)
+  gender               String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  orders               Order[]
+  photoId              String?
+  role                 Role               @default(USER)
+  reports              Report[]
+  onlineStatus         UserOnlineStatus[]
+  requests             Request[]
+  activities           UserActivity[]
 
-  isTestUser Boolean @default(false)
+  familyMembers User[]         @relation("FamilyRelation")
+  parent        User?          @relation("FamilyRelation", fields: [parentId], references: [id])
+  parentId      String?
+  notifications Notification[] @relation("NotificationOwner")
+  addresses     Address[]
 
-  deletedAt       DateTime?
-  receivedInvites Invite[]  @relation("ReceivedInvite")
-  sentInvites     Invite[]  @relation("SentInvite")
+  deletedAt           DateTime?
+  receivedInvites     Invite[]              @relation("ReceivedInvite")
+  sentInvites         Invite[]              @relation("SentInvite")
+  sessions            AdminUserSession[]
+  VerificationToken   VerificationToken[]
+  PasswordResetTokens PasswordResetTokens[]
+  heartRates          HeartRate[]
+  temperatures        Temperature[]
+  bloodPressures      BloodPressure[]
+  bloodOxygens        BloodOxygen[]
+  stepsRecords        Steps[]
+  sosMessages         Sos[]                 @relation("UserSosMessages")
+  sosFamilyAlerts     Sos[]                 @relation("SosFamilyMembers")
 
   ///  Device push notification tokens
   devicePNTokens DevicePNToken[]
 
-  status       UserStatus     @default(ACTIVE)
-  InviteCode   InviteCode[]
-  PostFeed     PostFeed[]
-  escrowRecord EscrowRecord[]
-
-  gatepasses GatePass[]
+  status UserStatus @default(ACTIVE)
 
   @@unique([countryCode, phoneNumber])
   @@index([username, phoneNumber])
-}
-
-model AdminUser {
-  id             String    @id @default(uuid())
-  uid            Int       @unique @default(autoincrement())
-  email          String    @unique @db.VarChar(255)
-  name           String?   @db.VarChar(255)
-  emailVerified  DateTime?
-  hashedPassword String?
-  image          String?
-  role           AdminRole @default(ADMIN)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  pinHash String?
-  pinSalt String?
-
-  sessions            AdminUserSession[]
-  VerificationToken   VerificationToken[]
-  PasswordResetTokens PasswordResetTokens[]
-  reportComments      ReportComment[]
-  approvals           Approval[]
+  @@map("users")
 }
 
 model AdminAllowedEmail {
@@ -115,12 +75,12 @@ model AdminAllowedEmail {
 }
 
 model VerificationToken {
-  id        String    @id @default(cuid())
-  token     String    @unique
+  id        String   @id @default(cuid())
+  token     String   @unique
   expiresAt DateTime
   email     String
   userId    String
-  adminUser AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([email, token])
 }
@@ -129,7 +89,7 @@ model AdminUserSession {
   id        String    @id @default(cuid())
   userId    String
   expiresAt DateTime?
-  adminUser AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model PasswordResetTokens {
@@ -139,8 +99,8 @@ model PasswordResetTokens {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  userId    String
-  adminUser AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model UserOnlineStatus {
@@ -164,4 +124,20 @@ model AuthToken {
   userId         String
   deviceUniqueId String?
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  ADMIN
+  USER
+  DOCTOR
+}
+
+model OnlineUser {
+  id             Int      @id @default(autoincrement())
+  userId         String   @db.Uuid
+  deviceUniqueId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, deviceUniqueId])
 }
