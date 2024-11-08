@@ -247,6 +247,16 @@ enum UserActivityType {
   UserLoggedOut
   UserOnline
   UserOffline
+  // REQUEST_CONNECTION
+  SentConnectionRequest
+  ReceivedConnectionRequest
+  AcceptedConnectionRequest
+  RejectedConnectionRequest
+  CancelledConnectionRequest
+  IgnoredConnectionRequest
+  BlockedConnectionRequest
+  BlockedUser
+  DisconnectedConnection
   // PAYMENT ACTIVITY
   InitiatedOrder
   SuccessfulOrder
