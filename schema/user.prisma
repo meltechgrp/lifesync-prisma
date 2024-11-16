@@ -5,7 +5,7 @@ model User {
   firstName       String?     @db.VarChar(255)
   lastName        String?     @db.VarChar(255)
   middleName      String?     @db.VarChar(255)
-  username        String?     @unique @db.VarChar(255)
+  password        String      @db.VarChar(255)
   phoneNumber     String      @db.VarChar(20)
   photo           FileRecord? @relation(fields: [photoId], references: [id])
   /// This is the user phone number parsed with international format
@@ -60,7 +60,7 @@ model User {
   status UserStatus @default(ACTIVE)
 
   @@unique([countryCode, phoneNumber])
-  @@index([username, phoneNumber])
+  @@index([phoneNumber])
   @@map("users")
 }
 
