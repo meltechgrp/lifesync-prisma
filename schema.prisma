@@ -1,0 +1,572 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String      @id @default(uuid())
+  uid             Int         @unique @default(autoincrement())
+  email           String?     @unique @db.VarChar(255)
+  firstName       String?     @db.VarChar(255)
+  lastName        String?     @db.VarChar(255)
+  middleName      String?     @db.VarChar(255)
+  password        String      @db.VarChar(255)
+  phoneNumber     String      @db.VarChar(20)
+  photo           FileRecord? @relation(fields: [photoId], references: [id])
+  /// This is the user phone number parsed with international format
+  intlPhoneNumber String      @unique @db.VarChar(20)
+  countryCode     String      @default("NG") @db.VarChar(3)
+
+  isPhoneVerified Boolean @default(false)
+  isEmailVerified Boolean @default(false)
+
+  connectionHash String?
+
+  requestedConnections Connection[]       @relation("RequestedConnection")
+  receivedConnections  Connection[]       @relation("RecievedConnection")
+  dob                  DateTime?
+  height               Float?
+  weight               Float?
+  authToken            AuthToken[] /// @render(IGNORE)
+  gender               String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  orders               Order[]
+  photoId              String?
+  role                 Role               @default(USER)
+  reports              Report[]
+  onlineStatus         UserOnlineStatus[]
+  requests             Request[]
+  activities           UserActivity[]
+
+  familyMembers User[]         @relation("FamilyRelation")
+  parent        User?          @relation("FamilyRelation", fields: [parentId], references: [id])
+  parentId      String?
+  notifications Notification[] @relation("NotificationOwner")
+  addresses     Address[]
+
+  deletedAt           DateTime?
+  receivedInvites     Invite[]              @relation("ReceivedInvite")
+  sentInvites         Invite[]              @relation("SentInvite")
+  sessions            AdminUserSession[]
+  VerificationToken   VerificationToken[]
+  PasswordResetTokens PasswordResetTokens[]
+  heartRates          HeartRate[]
+  temperatures        Temperature[]
+  bloodPressures      BloodPressure[]
+  bloodOxygens        BloodOxygen[]
+  stepsRecords        Steps[]
+  sosMessages         Sos[]                 @relation("UserSosMessages")
+  sosFamilyAlerts     Sos[]                 @relation("SosFamilyMembers")
+
+  ///  Device push notification tokens
+  devicePNTokens DevicePNToken[]
+
+  status UserStatus @default(ACTIVE)
+
+  @@unique([countryCode, phoneNumber])
+  @@index([phoneNumber])
+  @@map("users")
+}
+
+model AdminAllowedEmail {
+  id    String @id @default(uuid())
+  uid   Int    @unique @default(autoincrement())
+  email String @unique @db.VarChar(255)
+
+  allowedPages String[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model VerificationToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  expiresAt DateTime
+  email     String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([email, token])
+}
+
+model AdminUserSession {
+  id        String    @id @default(cuid())
+  userId    String
+  expiresAt DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PasswordResetTokens {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserOnlineStatus {
+  id             String       @id @default(uuid())
+  uid            Int          @unique @default(autoincrement())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  status         OnlineStatus @default(ONLINE)
+  deviceUniqueId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model AuthToken {
+  id  String @id @default(uuid())
+  uid Int    @unique @default(autoincrement())
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  expiredAt      DateTime
+  userId         String
+  deviceUniqueId String?
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  ADMIN
+  USER
+  DOCTOR
+}
+
+model OnlineUser {
+  id             Int      @id @default(autoincrement())
+  userId         String   @db.Uuid
+  deviceUniqueId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, deviceUniqueId])
+}
+
+model FileRecord {
+  id        String   @id @default(uuid())
+  uid       Int      @unique @default(autoincrement())
+  name      String
+  path      String   @unique
+  size      Int?
+  mimetype  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  width     Int?
+  height    Int?
+  ratio     Float?
+  users     User[]
+
+  deletedAt DateTime?
+
+  @@index([path])
+}
+
+model Request {
+  id           String         @id @default(uuid())
+  uid          Int            @unique @default(autoincrement())
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  status       RequestStatus  @default(PENDING)
+  userId       String
+  user         User           @relation(fields: [userId], references: [id])
+  message      String?
+  Notification Notification[]
+  email        String?        @unique @db.VarChar(255)
+  firstName    String?        @db.VarChar(255)
+  lastName     String?        @db.VarChar(255)
+  phoneNumber  String         @db.VarChar(20)
+}
+
+model Report {
+  id        String       @id @default(uuid())
+  uid       Int          @unique @default(autoincrement())
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  caseId    Int          @default(autoincrement())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id])
+  reason    String       @db.Text
+  status    ReportStatus @default(PENDING)
+  meta      Json
+  type      ReportType?
+
+  // entity which the report is related to
+  referenceType ReportReferenceType?
+  referenceId   String?
+}
+
+model HeartRate {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  value     Float // beats per minute
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("heartRates")
+}
+
+model Temperature {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  value     Float // body temperature in Celsius
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("temperatures")
+}
+
+model BloodPressure {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  systolic  Float? // systolic pressure
+  diastolic Float? // diastolic pressure
+  value     Float? // value
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("bloodPressures")
+}
+
+model BloodOxygen {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  value     Float // oxygen saturation in %
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("bloodOxygens")
+}
+
+model Steps {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  count     Int // steps count
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("stepsRecords")
+}
+
+// transactions are used to track the changes in the wallet
+model Transaction {
+  id  String @id @default(uuid())
+  uid Int    @unique @default(autoincrement())
+
+  amount    Float
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  currency  String            @default("NGN")
+  fee       Float             @default(0)
+  walletId  String
+  type      TransactionType?
+  status    TransactionStatus @default(PENDING)
+
+  comment       String?
+  source        String?
+  note          String?
+  notifications Notification[]
+  metadata      Json?
+  requestId     String?
+
+  relatedTransactionIds String[] @default([])
+  orderId               String?
+  order                 Order?   @relation(fields: [orderId], references: [id])
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  uid         Int         @unique @default(autoincrement())
+  amount      Float?
+  currency    String      @default("NGN")
+  status      OrderStatus @default(OPEN)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  title       String
+  description String?
+
+  closedAt DateTime?
+
+  userId String
+
+  user User @relation(fields: [userId], references: [id])
+
+  transactions Transaction[]
+}
+
+model Sos {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation("UserSosMessages", fields: [userId], references: [id]) // User who sent the SOS
+  familyMembers User[]   @relation("SosFamilyMembers")
+  message       String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("sosMessages")
+}
+
+model Address {
+  id        String   @id @default(uuid())
+  uid       Int      @unique @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  street    String?
+  city      String?
+  town      String?
+  lga       String?
+  state     String?
+  country   String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  active Boolean @default(true)
+
+  @@index([userId])
+}
+
+model Notification {
+  id            String               @id @default(uuid())
+  uid           Int                  @unique @default(autoincrement())
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  ownerId       String
+  owner         User                 @relation("NotificationOwner", fields: [ownerId], references: [id])
+  status        NotificationStatus   @default(UNREAD)
+  type          NotificationType
+  category      NotificationCategory
+  transactionId String?
+  transaction   Transaction?         @relation(fields: [transactionId], references: [id])
+  requestId     String?
+  request       Request?             @relation(fields: [requestId], references: [id])
+  inviteId      String?
+  invite        Invite?              @relation(fields: [inviteId], references: [id])
+}
+
+model UserActivity {
+  id        String   @id @default(uuid())
+  uid       Int      @unique @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId   String
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meta     Json?
+  activity UserActivityType
+}
+
+model DevicePNToken {
+  id        String              @id @default(uuid())
+  uid       Int                 @unique @default(autoincrement())
+  token     String
+  userId    String?
+  // device ID
+  did       String              @unique
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  user      User?               @relation(fields: [userId], references: [id])
+  status    DevicePNTokenStatus @default(ACTIVE)
+
+  deletedAt DateTime?
+
+  @@index([userId])
+  @@index([did])
+}
+
+model Invite {
+  id        String       @id @default(uuid())
+  uid       Int          @unique @default(autoincrement())
+  createdAt DateTime     @default(now())
+  status    InviteStatus @default(PENDING)
+
+  inviteeId    String
+  invitee      User           @relation("ReceivedInvite", fields: [inviteeId], references: [id])
+  inviterId    String
+  inviter      User           @relation("SentInvite", fields: [inviterId], references: [id])
+  notification Notification[]
+}
+
+model Connection {
+  id          String           @id @default(uuid())
+  uid         Int              @unique @default(autoincrement())
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  requesterId String
+  requester   User             @relation("RequestedConnection", fields: [requesterId], references: [id])
+  addresseeId String
+  addressee   User             @relation("RecievedConnection", fields: [addresseeId], references: [id])
+  status      ConnectionStatus @default(PENDING)
+
+  blockedById String?
+
+  @@unique([requesterId, addresseeId])
+  @@index([requesterId, addresseeId])
+}
+
+enum ConnectionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELED
+  IGNORED
+  BLOCKED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  FLAGGED
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  CANCELED
+}
+
+enum OrderStatus {
+  OPEN
+  CLOSED
+}
+
+enum ReportStatus {
+  PENDING
+  OPEN
+  ON_HOLD
+  RESOLVED
+  CLOSED
+}
+
+enum TransactionStatus {
+  PENDING
+  // for use mostly in withdrawals when transaction can no longer be cancelled
+  PROCESSING
+  SUCCESS
+  FAILED
+  CANCELED
+}
+
+enum TransactionType {
+  DEBIT
+  DEPOSIT
+  REVERSED
+  TOPUP
+  WITHDRAWAL
+  FEE_DEBIT
+  FEE_DEPOSIT
+}
+
+enum OnlineStatus {
+  ONLINE
+  OFFLINE
+}
+
+enum RequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELED
+}
+
+enum AppPlatform {
+  IOS
+  ANDROID
+  WEB
+}
+
+enum OrderProvider {
+  PAYSTACK
+  FLUTTERWAVE
+  FLICK
+}
+
+enum DevicePNTokenStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum UserActivityType {
+  // USER MONITORING
+  UserLoggedIn
+  UserLoggedOut
+  UserOnline
+  UserOffline
+  // REQUEST_CONNECTION
+  SentConnectionRequest
+  ReceivedConnectionRequest
+  AcceptedConnectionRequest
+  RejectedConnectionRequest
+  CancelledConnectionRequest
+  IgnoredConnectionRequest
+  BlockedConnectionRequest
+  BlockedUser
+  DisconnectedConnection
+  // PAYMENT ACTIVITY
+  InitiatedOrder
+  SuccessfulOrder
+  FailedOrder
+  CancelledOrder
+  AddedBankAccount
+  DepositSuccess
+  DepositFailed
+}
+
+enum NotificationStatus {
+  SEEN
+  UNREAD
+  READ
+}
+
+enum NotificationType {
+  PAYMENT_DEPOSIT
+  DELIVERY_WAYBILL_ADDED
+  DELIVERY_ITEM_DELIVERED
+  DELIVERY_CONFIRMED
+}
+
+enum NotificationCategory {
+  UPDATES
+  REQUESTS
+}
+
+enum ShippingMethod {
+  PICKUP
+  DELIVERY
+}
+
+enum UserStatus {
+  ACTIVE
+  VERIFIED
+  DEACTIVATED
+  SUSPENDED
+  BANNED
+  DELETED
+}
+
+enum ReportReferenceType {
+  PROFILE
+  TRANSACTION
+}
+
+enum ReportType {
+  PICKUP_NOT_RECEIVED
+  AFTER_PICKUP_ISSUE
+  DELIVERY_NO_WAYBILL_ADDED
+  DELIVERY_SHIPPING_ISSUE
+  DELIVERY_ARRIVED_ISSUE
+  AFTER_DELIVERY_RECEIPT_ISSUE
+}
